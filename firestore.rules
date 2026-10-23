@@ -1,0 +1,261 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 3 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isStudentOwner(studentId) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/students/$(studentId)) &&
+        get(/databases/$(database)/documents/students/$(studentId)).data.userId == request.auth.uid;
+    }
+
+    function isStudentParent(studentId) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/students/$(studentId)) &&
+        ('parentUids' in get(/databases/$(database)/documents/students/$(studentId)).data) &&
+        get(/databases/$(database)/documents/students/$(studentId)).data.parentUids is list &&
+        request.auth.uid in get(/databases/$(database)/documents/students/$(studentId)).data.parentUids;
+    }
+
+    function isValidStudent(data) {
+      return data.studentId is string && data.studentId.size() >= 5 && data.studentId.size() <= 30 &&
+             data.userId is string && data.userId.size() <= 128 &&
+             data.studentName is string && data.studentName.size() >= 1 && data.studentName.size() <= 100 &&
+             data.pairingStatus in ['unpaired', 'pending_approval', 'paired'] &&
+             (!('deviceModel' in data) || data.deviceModel == null || (data.deviceModel is string && data.deviceModel.size() <= 100)) &&
+             (!('parentUids' in data) || data.parentUids == null || (data.parentUids is list && data.parentUids.size() <= 20)) &&
+             (!('activeScheduleId' in data) || data.activeScheduleId == null || (data.activeScheduleId is string && data.activeScheduleId.size() <= 128)) &&
+             (!('isLockedManually' in data) || data.isLockedManually is bool) &&
+             (!('emergencyUnlockUntil' in data) || data.emergencyUnlockUntil == null || data.emergencyUnlockUntil is timestamp) &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidPairingRequest(data) {
+      return data.requestId is string && data.requestId.size() <= 128 &&
+             data.studentId is string && data.studentId.size() <= 30 &&
+             data.parentId is string && data.parentId.size() <= 128 &&
+             data.parentName is string && data.parentName.size() <= 100 &&
+             data.status in ['pending', 'approved', 'rejected', 'expired'] &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.expiresAt is timestamp &&
+             (!('updatedAt' in data) || data.updatedAt == null || (data.updatedAt is timestamp && data.updatedAt <= request.time));
+    }
+
+    function isValidSchedule(data) {
+      return data.scheduleId is string && data.scheduleId.size() <= 128 &&
+             data.studentId is string && data.studentId.size() <= 30 &&
+             data.name is string && data.name.size() <= 100 &&
+             data.daysOfWeek is list && data.daysOfWeek.size() <= 7 &&
+             data.periodsJson is string && data.periodsJson.size() <= 5000 &&
+             data.isApproved is bool &&
+             data.status in ['active', 'draft', 'proposed'] &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidApprovedApps(data) {
+      return data.studentId is string && data.studentId.size() <= 30 &&
+             data.packages is list && data.packages.size() <= 200 &&
+             (!('appNames' in data) || data.appNames == null || (data.appNames is list && data.appNames.size() <= 200)) &&
+             (!('updatedBy' in data) || data.updatedBy == null || (data.updatedBy is string && data.updatedBy.size() <= 128)) &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidStudentRequest(data) {
+      return data.requestId is string && data.requestId.size() <= 128 &&
+             data.studentId is string && data.studentId.size() <= 30 &&
+             data.userId is string && data.userId.size() <= 128 &&
+             data.type in ['app_permission', 'schedule_change', 'emergency_unlock'] &&
+             data.details is string && data.details.size() <= 1000 &&
+             data.status in ['pending', 'approved', 'rejected'] &&
+             (!('parentDecisionNote' in data) || data.parentDecisionNote == null || (data.parentDecisionNote is string && data.parentDecisionNote.size() <= 500)) &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidDeviceCommand(data) {
+      return data.commandId is string && data.commandId.size() <= 128 &&
+             data.studentId is string && data.studentId.size() <= 30 &&
+             data.parentId is string && data.parentId.size() <= 128 &&
+             data.commandType in ['lock_now', 'unlock', 'emergency_unlock', 'update_apps', 'update_schedule'] &&
+             (!('payload' in data) || data.payload == null || (data.payload is string && data.payload.size() <= 2000)) &&
+             data.status in ['pending', 'delivered', 'executing', 'applied', 'failed', 'expired'] &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             (!('executedAt' in data) || data.executedAt == null || data.executedAt is timestamp) &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    // Students collection
+    match /students/{studentId} {
+      allow get: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        (('parentUids' in resource.data) && resource.data.parentUids is list && request.auth.uid in resource.data.parentUids)
+      );
+
+      allow list: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        (('parentUids' in resource.data) && resource.data.parentUids is list && request.auth.uid in resource.data.parentUids)
+      );
+
+      allow create: if isSignedIn() &&
+                       isValidId(studentId) &&
+                       incoming().userId == request.auth.uid &&
+                       isValidStudent(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(studentId) &&
+                       (
+                         existing().userId == request.auth.uid ||
+                         (('parentUids' in existing()) && existing().parentUids is list && request.auth.uid in existing().parentUids)
+                       ) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidStudent(incoming());
+
+      allow delete: if isSignedIn() && isValidId(studentId) && existing().userId == request.auth.uid;
+    }
+
+    // Pairing Requests collection
+    match /pairing_requests/{requestId} {
+      allow get: if isSignedIn() && (
+        resource.data.parentId == request.auth.uid ||
+        isStudentOwner(resource.data.studentId)
+      );
+
+      allow list: if isSignedIn() && (
+        resource.data.parentId == request.auth.uid ||
+        resource.data.studentId is string
+      );
+
+      allow create: if isSignedIn() &&
+                       isValidId(requestId) &&
+                       incoming().parentId == request.auth.uid &&
+                       isValidPairingRequest(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(requestId) &&
+                       (existing().parentId == request.auth.uid || isStudentOwner(existing().studentId)) &&
+                       incoming().requestId == existing().requestId &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidPairingRequest(incoming());
+
+      allow delete: if isSignedIn() && isValidId(requestId) && (existing().parentId == request.auth.uid || isStudentOwner(existing().studentId));
+    }
+
+    // Schedules collection
+    match /schedules/{scheduleId} {
+      allow get: if isSignedIn() && (
+        isStudentOwner(resource.data.studentId) ||
+        isStudentParent(resource.data.studentId)
+      );
+
+      allow list: if isSignedIn() && resource.data.studentId is string;
+
+      allow create: if isSignedIn() &&
+                       isValidId(scheduleId) &&
+                       (isStudentOwner(incoming().studentId) || isStudentParent(incoming().studentId)) &&
+                       isValidSchedule(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(scheduleId) &&
+                       (isStudentOwner(existing().studentId) || isStudentParent(existing().studentId)) &&
+                       incoming().scheduleId == existing().scheduleId &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidSchedule(incoming());
+
+      allow delete: if isSignedIn() && isValidId(scheduleId) && (isStudentOwner(existing().studentId) || isStudentParent(existing().studentId));
+    }
+
+    // Approved Apps collection
+    match /approved_apps/{studentId} {
+      allow get: if isSignedIn() && (
+        isStudentOwner(studentId) ||
+        isStudentParent(studentId)
+      );
+
+      allow list: if isSignedIn() && resource.data.studentId is string;
+
+      allow create: if isSignedIn() &&
+                       isValidId(studentId) &&
+                       (isStudentOwner(studentId) || isStudentParent(studentId)) &&
+                       isValidApprovedApps(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(studentId) &&
+                       (isStudentOwner(studentId) || isStudentParent(studentId)) &&
+                       incoming().studentId == existing().studentId &&
+                       isValidApprovedApps(incoming());
+
+      allow delete: if isSignedIn() && isValidId(studentId) && (isStudentOwner(studentId) || isStudentParent(studentId));
+    }
+
+    // Student Requests collection
+    match /student_requests/{requestId} {
+      allow get: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        isStudentParent(resource.data.studentId)
+      );
+
+      allow list: if isSignedIn() && resource.data.studentId is string;
+
+      allow create: if isSignedIn() &&
+                       isValidId(requestId) &&
+                       incoming().userId == request.auth.uid &&
+                       isValidStudentRequest(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(requestId) &&
+                       (existing().userId == request.auth.uid || isStudentParent(existing().studentId)) &&
+                       incoming().requestId == existing().requestId &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidStudentRequest(incoming());
+
+      allow delete: if isSignedIn() && isValidId(requestId) && existing().userId == request.auth.uid;
+    }
+
+    // Device Commands collection
+    match /device_commands/{commandId} {
+      allow get: if isSignedIn() && (
+        resource.data.parentId == request.auth.uid ||
+        isStudentOwner(resource.data.studentId)
+      );
+
+      allow list: if isSignedIn() && resource.data.studentId is string;
+
+      allow create: if isSignedIn() &&
+                       isValidId(commandId) &&
+                       incoming().parentId == request.auth.uid &&
+                       isValidDeviceCommand(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(commandId) &&
+                       (existing().parentId == request.auth.uid || isStudentOwner(existing().studentId)) &&
+                       incoming().commandId == existing().commandId &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidDeviceCommand(incoming());
+
+      allow delete: if isSignedIn() && isValidId(commandId) && (existing().parentId == request.auth.uid || isStudentOwner(existing().studentId));
+    }
+  }
+}

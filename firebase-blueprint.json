@@ -1,0 +1,130 @@
+{
+  "entities": {
+    "Student": {
+      "title": "Student",
+      "description": "Student device profile and state registered in SafeLock",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string", "description": "Unique student identifier format SL-XXXXX" },
+        "userId": { "type": "string", "description": "Authenticated student user ID" },
+        "studentName": { "type": "string", "description": "Name of the student" },
+        "deviceModel": { "type": "string", "description": "Device hardware model name" },
+        "pairingStatus": { "type": "string", "enum": ["unpaired", "pending_approval", "paired"], "description": "Pairing state" },
+        "parentUids": { "type": "array", "description": "Authorized parent user IDs" },
+        "activeScheduleId": { "type": "string", "description": "ID of currently active schedule" },
+        "isLockedManually": { "type": "boolean", "description": "Instant manual lock flag" },
+        "emergencyUnlockUntil": { "type": "string", "format": "date-time", "description": "Timestamp until emergency unlock expires" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Update timestamp" }
+      },
+      "required": ["studentId", "userId", "studentName", "pairingStatus", "createdAt", "updatedAt"]
+    },
+    "PairingRequest": {
+      "title": "PairingRequest",
+      "description": "Invitation/pairing request sent by parent to link student",
+      "type": "object",
+      "properties": {
+        "requestId": { "type": "string", "description": "Unique pairing request ID" },
+        "studentId": { "type": "string", "description": "Target Student ID" },
+        "parentId": { "type": "string", "description": "Parent user ID" },
+        "parentName": { "type": "string", "description": "Display name of parent" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected", "expired"], "description": "Pairing status" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
+        "expiresAt": { "type": "string", "format": "date-time", "description": "Expiration timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Update timestamp" }
+      },
+      "required": ["requestId", "studentId", "parentId", "parentName", "status", "createdAt", "expiresAt"]
+    },
+    "Schedule": {
+      "title": "Schedule",
+      "description": "Time period schedule governing restricted vs normal phone usage",
+      "type": "object",
+      "properties": {
+        "scheduleId": { "type": "string", "description": "Unique schedule ID" },
+        "studentId": { "type": "string", "description": "Associated student ID" },
+        "name": { "type": "string", "description": "Schedule label" },
+        "daysOfWeek": { "type": "array", "description": "Days of week 1=Monday..7=Sunday" },
+        "periodsJson": { "type": "string", "description": "JSON serialized time periods" },
+        "isApproved": { "type": "boolean", "description": "Whether parent approved this schedule" },
+        "proposedBy": { "type": "string", "description": "student or parent" },
+        "status": { "type": "string", "enum": ["active", "draft", "proposed"], "description": "Schedule lifecycle" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Update timestamp" }
+      },
+      "required": ["scheduleId", "studentId", "name", "daysOfWeek", "periodsJson", "isApproved", "status", "createdAt", "updatedAt"]
+    },
+    "ApprovedApps": {
+      "title": "ApprovedApps",
+      "description": "List of authorized native Android applications for the student",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string", "description": "Student ID" },
+        "packages": { "type": "array", "description": "List of package names allowed" },
+        "appNames": { "type": "array", "description": "Display names of allowed packages" },
+        "updatedBy": { "type": "string", "description": "Parent UID who updated" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Update timestamp" }
+      },
+      "required": ["studentId", "packages", "updatedAt"]
+    },
+    "StudentRequest": {
+      "title": "StudentRequest",
+      "description": "Student initiated request for app permissions, schedule change, or emergency unlock",
+      "type": "object",
+      "properties": {
+        "requestId": { "type": "string", "description": "Unique request ID" },
+        "studentId": { "type": "string", "description": "Student ID" },
+        "userId": { "type": "string", "description": "Student auth UID" },
+        "type": { "type": "string", "enum": ["app_permission", "schedule_change", "emergency_unlock"], "description": "Request type" },
+        "details": { "type": "string", "description": "Detailed payload or explanation" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"], "description": "Approval status" },
+        "parentDecisionNote": { "type": "string", "description": "Optional parent note" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Submission timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Decision timestamp" }
+      },
+      "required": ["requestId", "studentId", "userId", "type", "details", "status", "createdAt", "updatedAt"]
+    },
+    "DeviceCommand": {
+      "title": "DeviceCommand",
+      "description": "Parent command targeted to student device for immediate execution",
+      "type": "object",
+      "properties": {
+        "commandId": { "type": "string", "description": "Unique command ID" },
+        "studentId": { "type": "string", "description": "Target student ID" },
+        "parentId": { "type": "string", "description": "Parent user ID" },
+        "commandType": { "type": "string", "enum": ["lock_now", "unlock", "emergency_unlock", "update_apps", "update_schedule"], "description": "Action type" },
+        "payload": { "type": "string", "description": "Optional command parameters" },
+        "status": { "type": "string", "enum": ["pending", "delivered", "executing", "applied", "failed", "expired"], "description": "Command lifecycle state" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
+        "executedAt": { "type": "string", "format": "date-time", "description": "Execution timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Update timestamp" }
+      },
+      "required": ["commandId", "studentId", "parentId", "commandType", "status", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/students/{studentId}": {
+      "schema": { "$ref": "#/entities/Student" },
+      "description": "Student device profile and status"
+    },
+    "/pairing_requests/{requestId}": {
+      "schema": { "$ref": "#/entities/PairingRequest" },
+      "description": "Pairing invitations"
+    },
+    "/schedules/{scheduleId}": {
+      "schema": { "$ref": "#/entities/Schedule" },
+      "description": "Usage schedules"
+    },
+    "/approved_apps/{studentId}": {
+      "schema": { "$ref": "#/entities/ApprovedApps" },
+      "description": "Parent approved application allowlist"
+    },
+    "/student_requests/{requestId}": {
+      "schema": { "$ref": "#/entities/StudentRequest" },
+      "description": "Student permission and unlock requests"
+    },
+    "/device_commands/{commandId}": {
+      "schema": { "$ref": "#/entities/DeviceCommand" },
+      "description": "Remote parent execution commands"
+    }
+  }
+}

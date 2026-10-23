@@ -1,0 +1,15 @@
+<resources>
+    <string name="app_name">SafeLock</string>
+    <string name="sign_in_with_google">Sign in with Google</string>
+    <string name="student_id">Student ID</string>
+    <string name="copy_student_id">Copy Student ID</string>
+    <string name="id_copied">Student ID copied to clipboard</string>
+    <string name="emergency_call">Emergency Call</string>
+    <string name="emergency_unlock">Emergency Unlock</string>
+    <string name="device_status_active">Device Active</string>
+    <string name="device_status_restricted">Restricted Period</string>
+    <string name="device_status_locked">Device Locked</string>
+    <string name="device_status_emergency">Emergency Mode Active</string>
+    <string name="admin_enable_title">Device Management</string>
+    <string name="admin_enable_desc">SafeLock uses supported Android Device Admin and Lock Task modes for parental safety.</string>
+</resources>

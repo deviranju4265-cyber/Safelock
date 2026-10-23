@@ -1,0 +1,6 @@
+{
+  "name": "SafeLock",
+  "description": "SafeLock native Android student application for parental control, device schedule management, app permissions, and emergency requests.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
